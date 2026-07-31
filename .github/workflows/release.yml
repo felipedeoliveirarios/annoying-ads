@@ -1,0 +1,65 @@
+name: Release
+
+# Dispara ao publicar uma tag v* (ex.: v0.1.0) ou manualmente.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # necessário para criar/anexar assets na Release
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset: annoying-popups-linux
+            dist: dist/annoying-popups
+          - os: macos-latest
+            asset: annoying-popups-macos
+            dist: dist/annoying-popups
+          - os: windows-latest
+            asset: annoying-popups-windows.exe
+            dist: dist/annoying-popups.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Python "de fábrica" (Tcl/Tk 8.6) — o hook de tkinter do PyInstaller
+      # empacota tudo automaticamente nos 3 SOs.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Instalar dependências (no Python do setup-python)
+        run: uv pip install --system pynput screeninfo pillow pyinstaller
+
+      - name: Build (single-file via build.py)
+        run: python build.py
+
+      - name: Renomear artefato
+        shell: bash
+        run: |
+          mkdir -p out
+          cp "${{ matrix.dist }}" "out/${{ matrix.asset }}"
+
+      - name: Upload como artifact do workflow
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: out/${{ matrix.asset }}
+
+      - name: Anexar na Release (só em tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/${{ matrix.asset }}

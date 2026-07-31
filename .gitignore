@@ -1,0 +1,27 @@
+# Ambientes
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# uv
+# (uv.lock é versionado de propósito)
+
+# PyInstaller
+build/
+dist/
+out/
+*.spec
+
+# SO
+.DS_Store
+Thumbs.db
+
+# Imagens do usuário (mantém as pastas, ignora as imagens)
+memes/*
+!memes/README.txt
+ads/*
+!ads/README.txt

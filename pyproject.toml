@@ -1,0 +1,16 @@
+[project]
+name = "annoying-popups"
+version = "0.1.0"
+description = "Trollagem inofensiva estilo Desktop Goose: pop-ups de anúncios falsos + memes."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pynput>=1.7.7",
+    "screeninfo>=0.8.1",
+    "pillow>=10.4.0",
+]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.11",
+]
