@@ -20,6 +20,9 @@ out/
 .DS_Store
 Thumbs.db
 
+# runtime
+.annoying.pid
+
 # Imagens do usuário (mantém as pastas, ignora as imagens)
 memes/*
 !memes/README.txt

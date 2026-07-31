@@ -48,6 +48,19 @@ uv run python annoying_popups.py
 Duplo clique em **`run.bat`** (ou `uv run pythonw annoying_popups.py` no
 terminal). O `pythonw` evita abrir janela de console.
 
+## 🕹️ Rodar em segundo plano
+Desanexado do terminal (pode fechar o terminal que segue rodando):
+```bash
+./run-bg.sh          # Linux/macOS  (salva o PID em .annoying.pid)
+run-bg.bat           # Windows      (usa pythonw, sem console)
+```
+Botão de pânico — encerra tudo mesmo que o ESC falhe:
+```bash
+./stop.sh            # Linux/macOS
+stop.bat             # Windows
+```
+No Windows, o executável (`--windowed`) já roda sem console, então é background por natureza.
+
 ## ⚙️ Opções
 ```
 uv run python annoying_popups.py --help
