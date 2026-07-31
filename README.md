@@ -71,6 +71,7 @@ uv run python annoying_popups.py --help
 --auto-stop 120     encerra sozinho após N minutos (0 desativa)
 --ads-dir ./ads      pasta com imagens de anúncios falsos
 --memes-dir ./memes  pasta com imagens de memes
+--exclude ndc,blanks subpastas a ignorar na varredura (separadas por vírgula)
 --no-sound           desativa o beep
 ```
 
@@ -80,8 +81,15 @@ O app **só exibe imagens** — não desenha mais anúncios de texto. Você forn
   um HTML/CSS para PNG, ou em qualquer editor).
 - **`memes/`** — suas imagens de memes.
 
-Formatos: `.png .jpg .jpeg .gif .bmp .webp`. O app sorteia de ambas as pastas e
-mistura tudo. Se não houver nenhuma imagem, ele avisa e encerra.
+Formatos: `.png .jpg .jpeg .gif .bmp .webp`. A varredura é **recursiva**: pode
+jogar subpastas — ou até clonar um repositório inteiro de imagens — dentro de
+`ads/`/`memes/` que o app encontra tudo. Subpastas ocultas (`.git` etc.) e as
+listadas em `--exclude` são ignoradas.
+
+No início, cada imagem é **redimensionada uma vez** para uma pasta temporária
+única (removida ao sair), de onde os pop-ups leem. Assim a memória fica limitada
+aos pop-ups na tela, mesmo com um acervo grande. Sem nenhuma imagem, ele avisa e
+encerra.
 
 ## 📦 Dependências
 Gerenciadas pelo **uv** (`pyproject.toml` + `uv.lock`):

@@ -3,17 +3,23 @@
 Annoying Popups - trollagem inofensiva estilo "computador com vírus".
 
 Exibe pop-ups de imagens (anúncios falsos + memes) em posições e monitores
-aleatórios. NÃO toca em arquivos, não altera configurações do sistema, não
-persiste após fechar. Kill switch: segure ESC por 5 segundos para fechar tudo.
+aleatórios. Busca recursivamente em ads/ e memes/, redimensiona cada imagem uma
+vez para uma pasta temporária única (removida ao sair) e exibe de lá. NÃO toca
+em arquivos do usuário, não altera configurações do sistema, não persiste após
+fechar. Kill switch: segure ESC por 5 segundos para fechar tudo.
 
 Requisitos: Python 3.8+, tkinter, pynput, Pillow. Opcional: screeninfo.
 """
 from __future__ import annotations
 
 import argparse
+import atexit
 import os
 import random
+import shutil
+import signal
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -62,6 +68,12 @@ else:
 # --- constantes -------------------------------------------------------------
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
 
+# Subpastas ignoradas por padrão ao varrer recursivamente (curadoria).
+DEFAULT_EXCLUDE = {"ndc", "blanks"}
+
+# Largura máxima das imagens no cache (folga sobre o tamanho exibido: 240-460px).
+CACHE_MAX_W = 600
+
 HINT_TEXT = "segure ESC por 5s p/ fechar tudo"
 
 
@@ -87,7 +99,10 @@ class PrankApp:
         self.root = tk.Tk()
         self.root.withdraw()  # a janela raiz fica invisível
         self.screens = get_screens()
-        self.images = self._load_images()
+        self.exclude = {x.strip().lower()
+                        for x in (self.args.exclude or "").split(",") if x.strip()}
+        self.cache_dir = None
+        self.images = self._prepare_cache()
         self.popups = []
         self.start_time = time.time()
         self.should_quit = False
@@ -101,15 +116,58 @@ class PrankApp:
         self.overlay = None  # overlay de contagem regressiva
 
     # -- imagens (anúncios + memes) -----------------------------------------
-    def _load_images(self):
+    def _gather_sources(self):
+        """Coleta imagens recursivamente de ads/ e memes/, pulando subpastas
+        ocultas (.git etc.) e as da lista de exclusão."""
+        srcs = []
+        for d in (self.args.ads_dir, self.args.memes_dir):
+            root = Path(d)
+            if not root.is_dir():
+                continue
+            for f in root.rglob("*"):
+                if not f.is_file() or f.suffix.lower() not in IMAGE_EXTS:
+                    continue
+                rel = f.relative_to(root)
+                if any(part.startswith(".") or part.lower() in self.exclude
+                       for part in rel.parts[:-1]):
+                    continue
+                srcs.append(f)
+        return srcs
+
+    def _prepare_cache(self):
+        """Redimensiona cada imagem UMA vez para uma pasta temporária única.
+        Os pop-ups leem desses arquivos pequenos — a memória fica limitada aos
+        pop-ups na tela, mesmo com um repositório grande de imagens."""
         if Image is None:
             return []
-        imgs = []
-        for d in (self.args.ads_dir, self.args.memes_dir):
-            p = Path(d)
-            if p.is_dir():
-                imgs += [f for f in p.iterdir() if f.suffix.lower() in IMAGE_EXTS]
-        return imgs
+        sources = self._gather_sources()
+        if not sources:
+            return []
+        self.cache_dir = Path(tempfile.mkdtemp(prefix="annoying-ads-"))
+        atexit.register(self._cleanup_cache)  # remove o temp mesmo em saída anormal
+        print(f"Preparando {len(sources)} imagem(ns)…")
+        cached = []
+        for i, src in enumerate(sources):
+            try:
+                img = Image.open(src)
+                img.load()
+                if img.width > CACHE_MAX_W:
+                    h = round(img.height * CACHE_MAX_W / img.width)
+                    img = img.resize((CACHE_MAX_W, h), Image.LANCZOS)
+                dst = self.cache_dir / f"{i:04d}.png"
+                try:
+                    img.save(dst)
+                except Exception:
+                    img.convert("RGB").save(dst)
+                cached.append(dst)
+            except Exception:
+                continue  # ignora arquivo inválido/corrompido
+        return cached
+
+    def _cleanup_cache(self):
+        if getattr(self, "cache_dir", None):
+            shutil.rmtree(self.cache_dir, ignore_errors=True)
+            self.cache_dir = None
 
     # -- criação de pop-ups --------------------------------------------------
     def _place_on_random_screen(self, win, w, h):
@@ -265,9 +323,20 @@ class PrankApp:
             self.root.destroy()
         except Exception:
             pass
+        self._cleanup_cache()
 
     # -- loop principal ------------------------------------------------------
+    def _on_signal(self, *_):
+        # stop.sh usa SIGTERM (kill/pkill); limpa o temp antes de sair.
+        self._cleanup_cache()
+        os._exit(0)
+
     def run(self):
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            try:
+                signal.signal(sig, self._on_signal)
+            except Exception:
+                pass
         self.listener = keyboard.Listener(on_press=self.on_press,
                                           on_release=self.on_release)
         self.listener.start()
@@ -294,6 +363,9 @@ def parse_args(argv=None):
                    help="pasta com imagens de anúncios falsos (padrão: ./ads)")
     p.add_argument("--memes-dir", default=str(BASE_DIR / "memes"),
                    help="pasta com imagens de memes (padrão: ./memes)")
+    p.add_argument("--exclude", default=",".join(sorted(DEFAULT_EXCLUDE)),
+                   help="subpastas a ignorar na varredura (separadas por vírgula; "
+                        f"padrão: {','.join(sorted(DEFAULT_EXCLUDE))})")
     p.add_argument("--no-sound", action="store_true", help="desativa o beep")
     return p.parse_args(argv)
 
